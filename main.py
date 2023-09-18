@@ -10,6 +10,7 @@ IMAGE_PATH = BASE_PATH + '/images/'
 
 # Colors (R, G, B)
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 GREEN = (78, 255, 87)
 YELLOW = (241, 255, 0)
 BLUE = (80, 255, 239)
@@ -40,9 +41,9 @@ class Ship(sprite.Sprite):
         self.speed = 5
 
     def update(self, keys, *args):
-        if keys[K_LEFT] and self.rect.x > 10:
+        if (keys[K_a] or keys[K_LEFT]) and self.rect.x > 10:
             self.rect.x -= self.speed
-        if keys[K_RIGHT] and self.rect.x < 740:
+        if (keys[K_d] or keys[K_RIGHT]) and self.rect.x < 740:
             self.rect.x += self.speed
         game.screen.blit(self.image, self.rect)
 
@@ -317,20 +318,18 @@ class SpaceInvaders(object):
         #   ALSA lib pcm.c:7963:(snd_pcm_recover) underrun occurred
         mixer.pre_init(44100, -16, 1, 4096)
         init()
+        pygame.key.set_repeat(500, 50)
         self.clock = time.Clock()
         self.caption = display.set_caption('Space Invaders')
         self.screen = SCREEN
         self.background = image.load(IMAGE_PATH + 'background.jpg').convert()
         self.startButtonRect = pygame.Rect(300, 240, 200, 50)
         self.introductionButtonRect = pygame.Rect(280, 330, 240, 50)
-        self.startButtonText = Text(FONT, 25, 'Start Game', WHITE,
-                                    315, 250)
-        self.introductionButtonText = Text(FONT, 25, 'Introduction', WHITE, 295, 340)
         self.startButtonHovered = False
         self.introductionButtonHovered = False
         self.showingIntroduction = False
         self.startGame = False
-
+        self.backButtonHovered = False
         self.mainScreen = True
         self.gameOver = False
         # Counter for enemy starting position (increased each new round)
@@ -455,8 +454,10 @@ class SpaceInvaders(object):
         self.enemy4 = transform.scale(self.enemy4, (80, 40))
         pygame.draw.rect(self.screen, GREEN if not self.startButtonHovered else YELLOW, self.startButtonRect)
         pygame.draw.rect(self.screen, GREEN if not self.introductionButtonHovered else YELLOW, self.introductionButtonRect)
-        self.startButtonText.draw(self.screen)
-        self.introductionButtonText.draw(self.screen)
+        startButtonText = Text(FONT, 25, 'Start Game', WHITE if not self.startButtonHovered else BLACK, 315, 250)
+        introductionButtonText = Text(FONT, 25, 'Introduction', WHITE if not self.introductionButtonHovered else BLACK, 295, 340)
+        startButtonText.draw(self.screen)
+        introductionButtonText.draw(self.screen)
 
     def check_collisions(self):
         sprite.groupcollide(self.bullets, self.enemyBullets, True, True)
@@ -529,11 +530,9 @@ class SpaceInvaders(object):
                 sys.exit()
 
     def show_introduction(self):
-        self.screen.blit(self.background, (0, 0))
-        # Display your introduction content here
-        introduction_text = Text(FONT, 25, "Welcome to Space Invaders!", WHITE, 100, 200)
         introductions = [
             "Instructions:",
+            "",
             "Use the LEFT and RIGHT arrow keys to move the ship.",
             "Press the SPACE key to shoot.",
             "Defeat all enemies to advance to the next round.",
@@ -541,26 +540,31 @@ class SpaceInvaders(object):
             "Collect mystery ship bonuses for extra points.",
             "Survive as long as you can to achieve a high score!",
         ]
-        y_position = 300
-        for introduction in introductions:
-            text = Text(FONT, 20, introduction, WHITE, 100, y_position)
-            text.draw(self.screen)
-            y_position += 30
-
-        back_button_text = Text(FONT, 25, "Back to Main Menu", WHITE, 280, 500)
-        back_button_rect = pygame.Rect(250, 480, 300, 50)
+        y_position = 100
+        back_button_rect = pygame.Rect(250, len(introductions) * 30 + y_position + 40, 330, 70)
+        back_button_text = Text(FONT, 25, "Back to Main Menu", WHITE if not back_button_rect.collidepoint(mouse.get_pos()) else BLACK, 280, len(introductions) * 30 + y_position + 60)
         pygame.draw.rect(self.screen, GREEN if not back_button_rect.collidepoint(mouse.get_pos()) else YELLOW,
                          back_button_rect)
         back_button_text.draw(self.screen)
-
-        for e in event.get():
-            if self.should_exit(e):
-                sys.exit()
-            if e.type == MOUSEMOTION:
-                back_button_hovered = back_button_rect.collidepoint(e.pos)
-            if e.type == MOUSEBUTTONDOWN and e.button == 1:
-                if back_button_hovered:
-                    self.showingIntroduction = False
+        if not self.showingIntroduction:
+            self.showingIntroduction = True
+            self.screen.blit(self.background, (0, 0))
+            # Display your introduction content here
+            introduction_text = Text(FONT, 25, "Welcome to Space Invaders!", WHITE, 100, 0)
+            for introduction in introductions:
+                text = Text(FONT, 20, introduction, WHITE, 100, y_position)
+                text.draw(self.screen)
+                y_position += 30
+        else:
+            for e in event.get():
+                if self.should_exit(e):
+                    sys.exit()
+                if e.type == MOUSEMOTION:
+                    self.backButtonHovered = back_button_rect.collidepoint(e.pos)
+                elif e.type == MOUSEBUTTONDOWN and e.button == 1:
+                    if self.backButtonHovered:
+                        self.showingIntroduction = False
+                        self.mainScreen = True
 
 
     def main(self):
@@ -587,7 +591,8 @@ class SpaceInvaders(object):
                             self.startGame = True
                             self.mainScreen = False
                         elif self.introductionButtonHovered:
-                            self.showingintroduction = True
+                            self.mainScreen = False
+                            self.show_introduction()
 
 
             elif self.startGame:
@@ -632,25 +637,7 @@ class SpaceInvaders(object):
                 self.create_game_over(currentTime)
 
             elif self.showingIntroduction:
-                self.screen.blit(self.background, (0, 0))
-                # Display your introduction content here
-                # You can draw text, images, or any other content you want
-                introduction_text = Text(FONT, 25, "Welcome to Space Invaders!", WHITE, 100, 200)
-                introduction_text.draw(self.screen)
-                back_button_text = Text(FONT, 25, "Back to Main Menu", WHITE, 280, 500)
-                back_button_rect = pygame.Rect(250, 480, 300, 50)
-                pygame.draw.rect(self.screen, GREEN if not back_button_rect.collidepoint(mouse.get_pos()) else YELLOW,
-                                 back_button_rect)
-                back_button_text.draw(self.screen)
-
-                for e in event.get():
-                    if self.should_exit(e):
-                        sys.exit()
-                    if e.type == MOUSEMOTION:
-                        back_button_hovered = back_button_rect.collidepoint(e.pos)
-                    if e.type == MOUSEBUTTONDOWN and e.button == 1:
-                        if back_button_hovered:
-                            self.showingIntroduction = False  # Reset the flag when back button is pressed
+                self.show_introduction()
 
             display.update()
             self.clock.tick(60)
